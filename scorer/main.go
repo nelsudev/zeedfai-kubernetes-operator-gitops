@@ -19,6 +19,15 @@ import (
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
+// registry e métricas são criados em main(), rotulados com PIPELINE_NAME,
+// para que o PrometheusRule do operator os possa filtrar por pipeline.
+var (
+	processed prometheus.Counter
+	flagged   prometheus.Counter
+	errors    prometheus.Counter
+	latency   prometheus.Histogram
+)
+
 type Transaction struct {
 	ID        string  `json:"id"`
 	Card      string  `json:"card"`
@@ -26,23 +35,6 @@ type Transaction struct {
 	Country   string  `json:"country"`
 	Timestamp int64   `json:"ts"`
 }
-
-var (
-	processed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "zeedfai_scorer_events_total", Help: "Eventos processados.",
-	})
-	flagged = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "zeedfai_scorer_flagged_total", Help: "Eventos marcados como suspeitos.",
-	})
-	errors = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "zeedfai_scorer_errors_total", Help: "Erros de processamento.",
-	})
-	latency = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "zeedfai_scorer_latency_seconds",
-		Help:    "Latência de scoring por evento (SLO: p99.9 < 0.250s).",
-		Buckets: []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5},
-	})
-)
 
 // score aplica a regra dummy: montante alto + país de risco = suspeito.
 // Numa fase posterior isto seria uma chamada a um modelo.
@@ -55,6 +47,18 @@ func main() {
 	brokers := getenv("KAFKA_BROKERS", "localhost:9092")
 	topic := getenv("KAFKA_TOPIC", "transactions")
 	group := getenv("KAFKA_GROUP", "zeedfai-scorer")
+	pipeline := getenv("PIPELINE_NAME", group)
+
+	reg := prometheus.WrapRegistererWith(prometheus.Labels{"pipeline": pipeline}, prometheus.DefaultRegisterer)
+	factory := promauto.With(reg)
+	processed = factory.NewCounter(prometheus.CounterOpts{Name: "zeedfai_scorer_events_total", Help: "Eventos processados."})
+	flagged = factory.NewCounter(prometheus.CounterOpts{Name: "zeedfai_scorer_flagged_total", Help: "Eventos marcados como suspeitos."})
+	errors = factory.NewCounter(prometheus.CounterOpts{Name: "zeedfai_scorer_errors_total", Help: "Erros de processamento."})
+	latency = factory.NewHistogram(prometheus.HistogramOpts{
+		Name:    "zeedfai_scorer_latency_seconds",
+		Help:    "Latência de scoring por evento (SLO: p99.9 < 0.250s).",
+		Buckets: []float64{.001, .005, .01, .025, .05, .1, .25, .5, 1, 2.5},
+	})
 
 	cl, err := kgo.NewClient(
 		kgo.SeedBrokers(strings.Split(brokers, ",")...),

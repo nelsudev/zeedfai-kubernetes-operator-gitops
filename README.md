@@ -43,8 +43,12 @@ kubectl get deploy,pods                # card-payments-eu-scorer com 2 réplicas
 make burst
 kubectl logs deploy/card-payments-eu-scorer --tail=5
 
-# 6. (Opcional) Prometheus + Grafana
-make monitoring
+# 6. Ver os recursos de observabilidade que o operator gera por pipeline
+kubectl get servicemonitor,prometheusrule,pdb -l zeedfai.io/pipeline=card-payments-eu
+kubectl get prometheusrule card-payments-eu-scorer -o yaml   # runbook_url nos alertas
+
+# Grafana (kube-prometheus-stack subiu no demo-up)
+kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80   # admin/zeedfai
 
 # Limpar
 make demo-down
@@ -60,12 +64,12 @@ kubectl get deploy -w
 ## Roadmap (fases)
 
 - [x] **F0–F2**: toolchain, scorer/loadgen, operator v1 (Deployment/Service + conditions)
-- [ ] **F2b**: ServiceMonitor + PrometheusRule com `runbook_url` + PDB
+- [x] **F2b**: ServiceMonitor + PrometheusRule com `runbook_url` + PDB (métricas rotuladas por `pipeline`)
 - [ ] **F3**: GitOps completo com Flux image automation
 - [ ] **F4**: autoscaler por consumer lag + self-healing por SLO p99.9 (com cooldown)
 - [ ] **F5**: canary com rollback automático
 - [ ] **F6**: platform-api (escritas via PR no repo GitOps) + GUI com botão de burst
-- [ ] **F7**: cloud — Terraform GKE/EKS e/ou Contabo k3s via API (`scripts/contabo/`)
+- [ ] **F7**: cloud — Terraform + Hetzner Cloud (`cluster-autoscaler` de nodes, billing à hora) como demonstração de escala real; Contabo (`scripts/contabo/`) como infra fixa/API alternativa
 
 ## Cloud barata: Contabo
 

@@ -7,8 +7,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -17,6 +17,8 @@ import (
 
 	platformv1alpha1 "github.com/bastian/zeedfai/operator/api/v1alpha1"
 )
+
+const runbookBaseURL = "https://github.com/bastian/zeedfai/blob/main/runbooks"
 
 // ScoringPipelineReconciler reconcilia ScoringPipelines: Deployment + Service
 // hoje; autoscaling por consumer lag e self-healing por SLO na Fase 4.
@@ -29,6 +31,8 @@ type ScoringPipelineReconciler struct {
 // +kubebuilder:rbac:groups=platform.zeedfai.io,resources=scoringpipelines/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;events,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors;prometheusrules,verbs=get;list;watch;create;update;patch
 
 func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
@@ -64,6 +68,7 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				{Name: "KAFKA_BROKERS", Value: sp.Spec.Kafka.Brokers},
 				{Name: "KAFKA_TOPIC", Value: sp.Spec.Kafka.Topic},
 				{Name: "KAFKA_GROUP", Value: group},
+				{Name: "PIPELINE_NAME", Value: sp.Name},
 			},
 			Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8080}},
 			ReadinessProbe: &corev1.Probe{ProbeHandler: corev1.ProbeHandler{
@@ -88,7 +93,9 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}); err != nil {
 		return ctrl.Result{}, fmt.Errorf("reconcile service: %w", err)
 	}
-	// TODO(fase 2b): ServiceMonitor + PrometheusRule (com runbook_url) + PDB.
+	if err := r.reconcileObservability(ctx, &sp, replicas); err != nil {
+		return ctrl.Result{}, fmt.Errorf("reconcile observability: %w", err)
+	}
 
 	// Status
 	var current appsv1.Deployment
