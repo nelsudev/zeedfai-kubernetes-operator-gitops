@@ -18,6 +18,12 @@ spec:
     - jsonPath: .status.replicas
       name: Replicas
       type: integer
+    - jsonPath: .status.desiredReplicas
+      name: Desired
+      type: integer
+    - jsonPath: .status.consumerLag
+      name: Lag
+      type: integer
     - jsonPath: .status.conditions[?(@.type=="Available")].status
       name: Available
       type: string
@@ -72,6 +78,12 @@ spec:
                 type: object
               scaling:
                 properties:
+                  cooldownSeconds:
+                    default: 30
+                    description: Tempo mínimo entre decisões de scaling, para evitar
+                      flapping.
+                    format: int32
+                    type: integer
                   maxReplicas:
                     default: 10
                     format: int32
@@ -83,7 +95,7 @@ spec:
                   targetLagPerReplica:
                     default: 1000
                     description: Lag alvo por réplica; acima disto o operator faz
-                      scale-out. (Fase 4)
+                      scale-out.
                     format: int64
                     type: integer
                 type: object
@@ -160,6 +172,18 @@ spec:
                   - type
                   type: object
                 type: array
+              consumerLag:
+                description: Consumer lag observado na última avaliação.
+                format: int64
+                type: integer
+              desiredReplicas:
+                description: Última decisão de scaling aplicada pelo autoscaler (consumer
+                  lag / SLO).
+                format: int32
+                type: integer
+              lastScaleTime:
+                format: date-time
+                type: string
               replicas:
                 format: int32
                 type: integer

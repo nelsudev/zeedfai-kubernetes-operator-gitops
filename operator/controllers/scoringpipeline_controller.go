@@ -3,6 +3,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,13 +45,59 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	replicas := sp.Spec.Scaling.MinReplicas
-	if replicas < 1 {
-		replicas = 1
+	minReplicas := sp.Spec.Scaling.MinReplicas
+	if minReplicas < 1 {
+		minReplicas = 1
 	}
-	// TODO(fase 4): substituir por decisão de autoscaling baseada em consumer
-	// lag (targetLagPerReplica) e latência p99.9 vinda do Prometheus, com
-	// cooldown para evitar flapping.
+	maxReplicas := sp.Spec.Scaling.MaxReplicas
+	if maxReplicas < minReplicas {
+		maxReplicas = minReplicas
+	}
+	group := sp.Spec.Kafka.ConsumerGroup
+	if group == "" {
+		group = "zeedfai-" + sp.Name
+	}
+
+	// Autoscaling por consumer lag, com self-healing por violação de SLO,
+	// sujeito a cooldown para evitar flapping em tráfego bursty.
+	replicas := minReplicas
+	if sp.Status.DesiredReplicas > 0 {
+		replicas = sp.Status.DesiredReplicas
+	}
+	cooldown := time.Duration(sp.Spec.Scaling.CooldownSeconds) * time.Second
+	if cooldown <= 0 {
+		cooldown = 30 * time.Second
+	}
+	var lastScale *time.Time
+	if sp.Status.LastScaleTime != nil {
+		t := sp.Status.LastScaleTime.Time
+		lastScale = &t
+	}
+
+	lag, lagErr := consumerLag(ctx, strings.Split(sp.Spec.Kafka.Brokers, ","), group, sp.Spec.Kafka.Topic)
+	if lagErr != nil {
+		log.Info("consumer lag unavailable, skipping autoscale evaluation", "error", lagErr.Error())
+	} else {
+		sp.Status.ConsumerLag = lag
+		desired := desiredReplicasFromLag(lag, sp.Spec.Scaling.TargetLagPerReplica, minReplicas, maxReplicas)
+
+		sloMs := sp.Spec.SLO.LatencyP999Ms
+		if sloMs <= 0 {
+			sloMs = 250
+		}
+		if sloLatencyViolated(ctx, sp.Name, sloMs) && desired < maxReplicas {
+			desired++
+			log.Info("SLO latency violated, forcing scale-out", "pipeline", sp.Name, "desired", desired)
+		}
+
+		if desired != replicas && cooldownElapsed(lastScale, cooldown) {
+			log.Info("autoscale decision", "pipeline", sp.Name, "lag", lag, "from", replicas, "to", desired)
+			replicas = desired
+			now := metav1.Now()
+			sp.Status.LastScaleTime = &now
+		}
+	}
+	sp.Status.DesiredReplicas = replicas
 
 	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: sp.Name + "-scorer", Namespace: sp.Namespace}}
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, dep, func() error {
@@ -58,10 +106,6 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		dep.Spec.Replicas = &replicas
 		dep.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
 		dep.Spec.Template.Labels = labels
-		group := sp.Spec.Kafka.ConsumerGroup
-		if group == "" {
-			group = "zeedfai-" + sp.Name
-		}
 		dep.Spec.Template.Spec.Containers = []corev1.Container{{
 			Name:  "scorer",
 			Image: sp.Spec.Model.Image,
@@ -120,7 +164,9 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.Status().Update(ctx, &sp); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	return ctrl.Result{}, nil
+	// Requeue periódico: o autoscaler precisa de reavaliar o lag mesmo sem
+	// mudanças ao spec (ex.: durante um burst de tráfego).
+	return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 
 func (r *ScoringPipelineReconciler) SetupWithManager(mgr ctrl.Manager) error {

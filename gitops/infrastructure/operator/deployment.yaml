@@ -18,10 +18,12 @@ spec:
         - name: ghcr-pull
       containers:
         - name: operator
-          image: ghcr.io/nelsudev/zeedfai-operator:0.1.1
+          image: ghcr.io/nelsudev/zeedfai-operator:0.2.0
           env:
             - name: ENABLE_LEADER_ELECTION
               value: "true"
+            - name: PROMETHEUS_URL
+              value: http://monitoring-kube-prometheus-prometheus.monitoring.svc:9090
           ports:
             - name: health
               containerPort: 8082
