@@ -5,3 +5,4 @@ loadgen/loadgen
 operator/operator
 .DS_Store
 kubeconfig*
+v2.3.0
