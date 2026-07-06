@@ -20,9 +20,12 @@ test: ## Testes
 	cd scorer && go vet ./...
 	cd loadgen && go vet ./...
 
-generate: ## Regenera deepcopy + CRDs
+generate: ## Regenera deepcopy + CRDs + RBAC (e sincroniza cópias em gitops/)
 	cd operator && $(CONTROLLER_GEN) object paths=./api/...
 	cd operator && $(CONTROLLER_GEN) crd paths=./... output:crd:dir=./config/crd
+	cd operator && $(CONTROLLER_GEN) rbac:roleName=zeedfai-operator paths=./... output:rbac:dir=./config/rbac
+	cp operator/config/crd/platform.zeedfai.io_scoringpipelines.yaml gitops/infrastructure/crds/
+	cp operator/config/rbac/role.yaml gitops/infrastructure/operator/clusterrole.yaml
 
 images: ## Build das imagens e load para o kind
 	docker build -t zeedfai/scorer:dev scorer/

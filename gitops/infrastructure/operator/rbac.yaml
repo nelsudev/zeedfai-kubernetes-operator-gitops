@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zeedfai-operator
+  namespace: zeedfai-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zeedfai-operator
+subjects:
+  - kind: ServiceAccount
+    name: zeedfai-operator
+    namespace: zeedfai-system
+roleRef:
+  kind: ClusterRole
+  name: zeedfai-operator
+  apiGroup: rbac.authorization.k8s.io

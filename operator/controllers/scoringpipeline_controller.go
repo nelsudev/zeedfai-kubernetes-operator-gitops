@@ -75,6 +75,9 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				HTTPGet: &corev1.HTTPGetAction{Path: "/healthz", Port: intstrFromInt(8080)},
 			}},
 		}}
+		if sp.Spec.Model.ImagePullSecret != "" {
+			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: sp.Spec.Model.ImagePullSecret}}
+		}
 		return controllerutil.SetControllerReference(&sp, dep, r.Scheme())
 	})
 	if err != nil {

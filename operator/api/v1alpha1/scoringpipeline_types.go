@@ -18,6 +18,10 @@ var (
 type ModelSpec struct {
 	// Imagem do serviço de scoring (consumidor Kafka).
 	Image string `json:"image"`
+	// Nome de um Secret docker-registry no mesmo namespace, para pull de
+	// imagens privadas (ex.: GHCR). Opcional.
+	// +optional
+	ImagePullSecret string `json:"imagePullSecret,omitempty"`
 }
 
 type KafkaSpec struct {

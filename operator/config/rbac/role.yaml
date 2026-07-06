@@ -1,0 +1,73 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zeedfai-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - services
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - prometheusrules
+  - servicemonitors
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - platform.zeedfai.io
+  resources:
+  - scoringpipelines
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - platform.zeedfai.io
+  resources:
+  - scoringpipelines/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch

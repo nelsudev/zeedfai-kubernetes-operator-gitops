@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zeedfai-operator
+  namespace: zeedfai-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: zeedfai-operator}
+  template:
+    metadata:
+      labels: {app: zeedfai-operator}
+    spec:
+      serviceAccountName: zeedfai-operator
+      # Imagem privada no GHCR: requer o secret "ghcr-pull" (docker-registry),
+      # criado fora do Git — ver gitops/infrastructure/operator/README.md.
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: operator
+          image: ghcr.io/nelsudev/zeedfai-operator:0.1.0
+          env:
+            - name: ENABLE_LEADER_ELECTION
+              value: "true"
+          ports:
+            - name: health
+              containerPort: 8082
+            - name: metrics
+              containerPort: 8083
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
