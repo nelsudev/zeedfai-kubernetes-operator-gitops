@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: operator
+        run: cd operator && go build ./... && go vet ./... && go test ./...
+      - name: scorer
+        run: cd scorer && go build ./... && go vet ./...
+      - name: loadgen
+        run: cd loadgen && go build ./... && go vet ./...
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: build-test
+    strategy:
+      matrix:
+        component: [operator, scorer, loadgen]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.component }} image (no push)
+        run: docker build -t zeedfai-${{ matrix.component }}:ci ${{ matrix.component }}/

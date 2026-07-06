@@ -1,0 +1,26 @@
+name: Teardown cloud demo
+
+# Rede de segurança de custo: destrói qualquer VM de demo (Contabo/Hetzner)
+# esquecida ligada. Corre manualmente (botão "Run workflow") e também todas
+# as noites, para o caso de alguém se esquecer de desligar no fim do dia.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC diariamente
+
+jobs:
+  teardown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Destroy any zeedfai cloud resources (Contabo + Hetzner)
+        env:
+          CNTB_CLIENT_ID: ${{ secrets.CNTB_CLIENT_ID }}
+          CNTB_CLIENT_SECRET: ${{ secrets.CNTB_CLIENT_SECRET }}
+          CNTB_API_USER: ${{ secrets.CNTB_API_USER }}
+          CNTB_API_PASS: ${{ secrets.CNTB_API_PASS }}
+          HCLOUD_TOKEN: ${{ secrets.HCLOUD_TOKEN }}
+        run: |
+          chmod +x scripts/teardown-cloud.sh scripts/contabo/*.sh
+          ./scripts/teardown-cloud.sh

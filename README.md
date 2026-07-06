@@ -82,11 +82,16 @@ flux get helmreleases -A
 
 - [x] **F0–F2**: toolchain, scorer/loadgen, operator v1 (Deployment/Service + conditions)
 - [x] **F2b**: ServiceMonitor + PrometheusRule com `runbook_url` + PDB (métricas rotuladas por `pipeline`)
-- [ ] **F3**: GitOps completo com Flux image automation
-- [ ] **F4**: autoscaler por consumer lag + self-healing por SLO p99.9 (com cooldown)
+- [x] **F3**: GitOps completo — operator, Strimzi, Kafka, kube-prometheus-stack, todos geridos pelo Flux
+- [x] **F4**: autoscaler por consumer lag + self-healing por SLO p99.9 (verificado: burst 3000ev/s → scale 2→10→2)
 - [ ] **F5**: canary com rollback automático
 - [ ] **F6**: platform-api (escritas via PR no repo GitOps) + GUI com botão de burst
 - [ ] **F7**: cloud — Terraform + Hetzner Cloud (`cluster-autoscaler` de nodes, billing à hora) como demonstração de escala real; Contabo (`scripts/contabo/`) como infra fixa/API alternativa
+
+## CI/CD (GitHub Actions)
+
+- `ci.yml`: build + vet + test dos três componentes Go em cada push/PR, e build (sem push) das três imagens Docker.
+- `teardown-cloud-demo.yml`: destrói qualquer VM de demo (Contabo/Hetzner) esquecida — manual ou todas as noites às 03:00 UTC. Ver `scripts/contabo/README.md` para os secrets necessários.
 
 ## Cloud barata: Contabo
 

@@ -21,6 +21,17 @@ export CNTB_API_USER=...
 export CNTB_API_PASS=...
 ```
 
+## Teardown automático (rede de segurança de custo)
+
+`.github/workflows/teardown-cloud-demo.yml` corre `scripts/teardown-cloud.sh`
+todas as noites (03:00 UTC) e também manualmente (aba Actions → "Run
+workflow"). Destrói qualquer instância Contabo com `displayName` a começar
+por `zeedfai` e qualquer server Hetzner com label `zeedfai=true`. Configura os
+secrets do repo (Settings → Secrets and variables → Actions):
+`CNTB_CLIENT_ID`, `CNTB_CLIENT_SECRET`, `CNTB_API_USER`, `CNTB_API_PASS`,
+`HCLOUD_TOKEN`. Se não configurares nenhum, o workflow corre e não faz nada
+(cada provider é ignorado sem credenciais).
+
 ## Uso
 
 ```bash
