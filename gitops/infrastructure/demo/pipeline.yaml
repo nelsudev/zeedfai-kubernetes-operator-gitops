@@ -5,8 +5,16 @@ metadata:
   namespace: default
 spec:
   model:
-    image: ghcr.io/nelsudev/zeedfai-scorer:0.1.0
+    image: ghcr.io/nelsudev/zeedfai-scorer:0.2.0
     imagePullSecret: ghcr-pull
+  # Canary deliberadamente mau (FAULT_RATE=0.5) para demonstrar o rollback
+  # automático; após a demo, remover este bloco via novo commit.
+  canary:
+    enabled: true
+    image: ghcr.io/nelsudev/zeedfai-scorer:bad-canary
+    stepPercent: 20
+    errorRateThresholdPct: 5
+    evaluationSeconds: 120
   kafka:
     brokers: zeedfai-kafka-bootstrap.kafka:9092
     topic: transactions
