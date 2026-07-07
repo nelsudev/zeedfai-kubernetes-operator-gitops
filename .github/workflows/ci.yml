@@ -13,8 +13,11 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
-      - name: operator
-        run: cd operator && go build ./... && go vet ./... && go test ./...
+      - name: operator (build, vet, envtest integration)
+        run: |
+          cd operator
+          go build ./... && go vet ./...
+          KUBEBUILDER_ASSETS="$(go run sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.20 use 1.32.x -p path)" go test ./... -count=1
       - name: scorer
         run: cd scorer && go build ./... && go vet ./...
       - name: loadgen

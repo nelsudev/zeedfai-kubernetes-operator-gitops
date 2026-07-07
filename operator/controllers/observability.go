@@ -2,10 +2,12 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	monitoringv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -28,6 +30,12 @@ func (r *ScoringPipelineReconciler) reconcileObservability(ctx context.Context, 
 		sm.Spec.Endpoints = []monitoringv1.Endpoint{{Port: "metrics", Interval: "15s"}}
 		return controllerutil.SetControllerReference(sp, sm, r.Scheme())
 	}); err != nil {
+		// Cluster sem prometheus-operator (ou envtest): degradar com aviso em
+		// vez de bloquear a gestão do pipeline por falta de monitoring.
+		if isNoKindMatch(err) {
+			log.Info("monitoring CRDs not installed; skipping ServiceMonitor/PrometheusRule")
+			return r.reconcilePDB(ctx, sp, replicas)
+		}
 		return fmt.Errorf("servicemonitor: %w", err)
 	}
 
@@ -73,7 +81,16 @@ func (r *ScoringPipelineReconciler) reconcileObservability(ctx context.Context, 
 		return fmt.Errorf("prometheusrule: %w", err)
 	}
 
-	minAvailable := intstr.FromInt(int(max32(minReplicas-1, 0)))
+	if err := r.reconcilePDB(ctx, sp, minReplicas); err != nil {
+		return err
+	}
+	log.V(1).Info("observability reconciled", "pipeline", sp.Name)
+	return nil
+}
+
+func (r *ScoringPipelineReconciler) reconcilePDB(ctx context.Context, sp *platformv1alpha1.ScoringPipeline, replicas int32) error {
+	labels := map[string]string{"app.kubernetes.io/name": "zeedfai-scorer", "zeedfai.io/pipeline": sp.Name}
+	minAvailable := intstr.FromInt(int(max32(replicas-1, 0)))
 	pdb := &policyv1.PodDisruptionBudget{ObjectMeta: metav1.ObjectMeta{Name: sp.Name + "-scorer", Namespace: sp.Namespace}}
 	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, pdb, func() error {
 		pdb.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
@@ -82,9 +99,14 @@ func (r *ScoringPipelineReconciler) reconcileObservability(ctx context.Context, 
 	}); err != nil {
 		return fmt.Errorf("pdb: %w", err)
 	}
-
-	log.V(1).Info("observability reconciled", "pipeline", sp.Name)
 	return nil
+}
+
+// isNoKindMatch deteta "kind não registado na API server" mesmo se o erro
+// vier embrulhado (IsNoMatchError faz type assertion simples, sem Unwrap).
+func isNoKindMatch(err error) bool {
+	var noMatch *apimeta.NoKindMatchError
+	return errors.As(err, &noMatch)
 }
 
 func ptrDuration(s monitoringv1.Duration) *monitoringv1.Duration { return &s }

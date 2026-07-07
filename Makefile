@@ -22,6 +22,9 @@ test: ## Testes
 	cd loadgen && go vet ./...
 	cd platform-api && go vet ./...
 
+test-integration: ## Testes envtest do controller (descarrega kube-apiserver/etcd de teste)
+	cd operator && KUBEBUILDER_ASSETS="$$(go run sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.20 use 1.32.x -p path)" go test ./controllers/... -v -count=1
+
 generate: ## Regenera deepcopy + CRDs + RBAC (e sincroniza cópias em gitops/)
 	cd operator && $(CONTROLLER_GEN) object paths=./api/...
 	cd operator && $(CONTROLLER_GEN) crd paths=./... output:crd:dir=./config/crd
