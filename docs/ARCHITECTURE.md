@@ -5,10 +5,10 @@ repo pela primeira vez (incluindo o próprio autor, três meses depois). Está
 organizado por camada: domínio (Go), API Kubernetes, GitOps (Flux),
 CI/CD, e scripts auxiliares.
 
-Estado no momento em que isto foi escrito: Fases 0–4 completas e verificadas
-ao vivo num cluster kind; Fase 5 (canary) implementada e a aguardar teste ao
-vivo; Fase 6 (platform-api + GUI) ainda por construir. Ver `README.md` para o
-checklist de fases atualizado.
+Estado: Fases 0–6 completas e verificadas ao vivo num cluster kind (o teste
+da Fase 5 encontrou e corrigiu dois bugs de observabilidade — ver secção
+"Observabilidade: as duas armadilhas"). Falta a Fase 7 (cloud/Hetzner). Ver
+`README.md` para o checklist atualizado.
 
 ---
 
@@ -363,6 +363,50 @@ próximo passo pendente):**
 3. Observar: `<pipeline>-scorer-canary` Deployment aparece, e em minutos o
    Event `CanaryRolledBack` e a condition `CanaryHealthy=False` aparecem, e
    o Deployment canary desaparece sozinho.
+
+---
+
+## 4b. platform-api + GUI (Fase 6) — `platform-api/`
+
+Fachada de operações/DX no estilo "mini control plane interno". Decisões:
+
+- **Read-only sobre o cluster, por desenho.** `GET /api/pipelines` lista os
+  `ScoringPipeline` via dynamic client (RBAC só com get/list/watch);
+  escritas de configuração continuam a ser exclusivas do Git — um
+  `POST /pipelines` que abrisse um PR no repo GitOps é a extensão natural,
+  documentada mas fora de escopo. A exceção pragmática é `POST /api/burst`,
+  que fala com o loadgen: é ferramenta de teste, não configuração.
+- **`GET /api/pipelines/{name}/metrics`** faz proxy de **range-queries
+  pré-definidas** ao Prometheus (lag, réplicas prontas, p99.9 em ms,
+  throughput; últimos 30 min, step 15s). Nunca aceita PromQL vindo do
+  browser — o proxy existe justamente para não expor o Prometheus.
+- **GUI embebida no binário** (`go:embed`, um único `index.html` sem
+  dependências externas): tabela de pipelines com estado/canary, quatro
+  gráficos SVG de **série única** (um eixo por gráfico — nunca dual-axis),
+  linha de SLO a 250 ms no gráfico de latência, crosshair+tooltip no hover,
+  dark mode via `prefers-color-scheme`, e o botão "🔥 Burst".
+- As séries de lag/réplicas vêm das gauges `zeedfai_operator_*` (não do
+  scorer) — por isso existe o Service+ServiceMonitor do próprio operator em
+  `gitops/infrastructure/operator/metrics.yaml`.
+
+Aceder: `kubectl -n zeedfai-system port-forward svc/platform-api 8090:8090`
+→ http://localhost:8090.
+
+## 4c. Observabilidade: as duas armadilhas que o teste ao vivo apanhou
+
+Registadas aqui porque são o tipo de falha silenciosa que só aparece em
+execução — build, vet e até a demo do autoscaler passavam sem elas:
+
+1. **O kube-prometheus-stack não seleciona ServiceMonitors de terceiros por
+   default** — só os que têm o label `release=monitoring`. Resultado: zero
+   séries `zeedfai_*` no Prometheus, e como o SLO check e a análise de
+   canary "falham aberto", tudo parecia verde — um canary com 50% de erros
+   passou a avaliação. Fix: `*SelectorNilUsesHelmValues: false` nos values
+   do HelmRelease. Moral: fail-open em observabilidade exige um teste que
+   prove que os dados fluem.
+2. **ServiceMonitor seleciona Services por label, não por spec.selector.**
+   O controller criava o Service sem labels no metadata (só com o selector
+   de pods) — match impossível. Fix: labels no próprio Service.
 
 ---
 
