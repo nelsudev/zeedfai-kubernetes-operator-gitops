@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"math/rand"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -48,8 +50,9 @@ func main() {
 	topic := getenv("KAFKA_TOPIC", "transactions")
 	group := getenv("KAFKA_GROUP", "zeedfai-scorer")
 	pipeline := getenv("PIPELINE_NAME", group)
+	role := getenv("ROLE", "stable")
 
-	reg := prometheus.WrapRegistererWith(prometheus.Labels{"pipeline": pipeline}, prometheus.DefaultRegisterer)
+	reg := prometheus.WrapRegistererWith(prometheus.Labels{"pipeline": pipeline, "role": role}, prometheus.DefaultRegisterer)
 	factory := promauto.With(reg)
 	processed = factory.NewCounter(prometheus.CounterOpts{Name: "zeedfai_scorer_events_total", Help: "Eventos processados."})
 	flagged = factory.NewCounter(prometheus.CounterOpts{Name: "zeedfai_scorer_flagged_total", Help: "Eventos marcados como suspeitos."})
@@ -90,8 +93,13 @@ func main() {
 			}
 			continue
 		}
+		faultRate, _ := strconv.ParseFloat(getenv("FAULT_RATE", "0"), 64)
 		fetches.EachRecord(func(r *kgo.Record) {
 			start := time.Now()
+			if faultRate > 0 && rand.Float64() < faultRate {
+				errors.Inc()
+				return
+			}
 			var t Transaction
 			if err := json.Unmarshal(r.Value, &t); err != nil {
 				errors.Inc()

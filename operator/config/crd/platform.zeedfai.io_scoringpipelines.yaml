@@ -50,6 +50,33 @@ spec:
             type: object
           spec:
             properties:
+              canary:
+                properties:
+                  enabled:
+                    description: Ativa uma análise de canary para spec.canary.image.
+                    type: boolean
+                  errorRateThresholdPct:
+                    default: 5
+                    description: Taxa de erro (%) acima da qual há rollback automático.
+                    format: int32
+                    type: integer
+                  evaluationSeconds:
+                    default: 120
+                    description: Janela de avaliação antes de marcar o canary como
+                      seguro para promoção.
+                    format: int32
+                    type: integer
+                  image:
+                    description: Imagem candidata a validar antes de se tornar spec.model.image.
+                    type: string
+                  stepPercent:
+                    default: 20
+                    description: |-
+                      % do total de réplicas atribuída ao canary (partilha o consumer group
+                      com o stable, por isso recebe essa fração do tráfego via rebalance).
+                    format: int32
+                    type: integer
+                type: object
               kafka:
                 properties:
                   brokers:
@@ -116,6 +143,9 @@ spec:
             type: object
           status:
             properties:
+              canaryStartedAt:
+                format: date-time
+                type: string
               conditions:
                 items:
                   description: Condition contains details for one aspect of the current

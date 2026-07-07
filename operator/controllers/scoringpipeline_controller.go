@@ -79,6 +79,7 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		log.Info("consumer lag unavailable, skipping autoscale evaluation", "error", lagErr.Error())
 	} else {
 		sp.Status.ConsumerLag = lag
+		consumerLagGauge.WithLabelValues(sp.Name).Set(float64(lag))
 		desired := desiredReplicasFromLag(lag, sp.Spec.Scaling.TargetLagPerReplica, minReplicas, maxReplicas)
 
 		sloMs := sp.Spec.SLO.LatencyP999Ms
@@ -98,6 +99,7 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 	sp.Status.DesiredReplicas = replicas
+	desiredReplicasGauge.WithLabelValues(sp.Name).Set(float64(replicas))
 
 	dep := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{Name: sp.Name + "-scorer", Namespace: sp.Namespace}}
 	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, dep, func() error {
@@ -144,6 +146,9 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	if err := r.reconcileObservability(ctx, &sp, replicas); err != nil {
 		return ctrl.Result{}, fmt.Errorf("reconcile observability: %w", err)
 	}
+	if err := r.reconcileCanary(ctx, &sp, group, replicas); err != nil {
+		return ctrl.Result{}, fmt.Errorf("reconcile canary: %w", err)
+	}
 
 	// Status
 	var current appsv1.Deployment
@@ -151,6 +156,7 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	reason, msg := "Progressing", "waiting for ready replicas"
 	if err := r.Get(ctx, types.NamespacedName{Name: dep.Name, Namespace: dep.Namespace}, &current); err == nil {
 		sp.Status.Replicas = current.Status.ReadyReplicas
+		readyReplicasGauge.WithLabelValues(sp.Name).Set(float64(current.Status.ReadyReplicas))
 		if current.Status.ReadyReplicas >= replicas {
 			available, reason, msg = metav1.ConditionTrue, "AllReplicasReady", "all replicas ready"
 		}

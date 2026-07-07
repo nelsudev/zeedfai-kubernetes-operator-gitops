@@ -58,6 +58,28 @@ type ScalingSpec struct {
 	CooldownSeconds int32 `json:"cooldownSeconds,omitempty"`
 }
 
+type CanarySpec struct {
+	// Ativa uma análise de canary para spec.canary.image.
+	// +optional
+	Enabled bool `json:"enabled,omitempty"`
+	// Imagem candidata a validar antes de se tornar spec.model.image.
+	// +optional
+	Image string `json:"image,omitempty"`
+	// % do total de réplicas atribuída ao canary (partilha o consumer group
+	// com o stable, por isso recebe essa fração do tráfego via rebalance).
+	// +kubebuilder:default=20
+	// +optional
+	StepPercent int32 `json:"stepPercent,omitempty"`
+	// Taxa de erro (%) acima da qual há rollback automático.
+	// +kubebuilder:default=5
+	// +optional
+	ErrorRateThresholdPct int32 `json:"errorRateThresholdPct,omitempty"`
+	// Janela de avaliação antes de marcar o canary como seguro para promoção.
+	// +kubebuilder:default=120
+	// +optional
+	EvaluationSeconds int32 `json:"evaluationSeconds,omitempty"`
+}
+
 type ScoringPipelineSpec struct {
 	Model ModelSpec `json:"model"`
 	Kafka KafkaSpec `json:"kafka"`
@@ -65,6 +87,8 @@ type ScoringPipelineSpec struct {
 	SLO SLOSpec `json:"slo,omitempty"`
 	// +optional
 	Scaling ScalingSpec `json:"scaling,omitempty"`
+	// +optional
+	Canary CanarySpec `json:"canary,omitempty"`
 }
 
 type ScoringPipelineStatus struct {
@@ -78,6 +102,8 @@ type ScoringPipelineStatus struct {
 	ConsumerLag int64 `json:"consumerLag,omitempty"`
 	// +optional
 	LastScaleTime *metav1.Time `json:"lastScaleTime,omitempty"`
+	// +optional
+	CanaryStartedAt *metav1.Time `json:"canaryStartedAt,omitempty"`
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
