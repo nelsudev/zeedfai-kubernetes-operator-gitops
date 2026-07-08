@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   model:
-    image: ghcr.io/nelsudev/zeedfai-scorer:0.2.0
+    image: ghcr.io/nelsudev/zeedfai-scorer:0.2.0 # {"$imagepolicy": "flux-system:zeedfai-scorer"}
     imagePullSecret: ghcr-pull
   # Demo de rollback automático de canary (2026-07-07): com
   # image=zeedfai-scorer:bad-canary (FAULT_RATE=0.5) aqui, o operator

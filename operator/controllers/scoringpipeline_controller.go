@@ -109,6 +109,7 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		dep.Spec.Replicas = &replicas
 		dep.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
 		dep.Spec.Template.Labels = labels
+		dep.Spec.Template.Spec.SecurityContext = hardenedPodSecurityContext()
 		dep.Spec.Template.Spec.Containers = []corev1.Container{{
 			Name:  "scorer",
 			Image: sp.Spec.Model.Image,
@@ -118,7 +119,9 @@ func (r *ScoringPipelineReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				{Name: "KAFKA_GROUP", Value: group},
 				{Name: "PIPELINE_NAME", Value: sp.Name},
 			},
-			Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8080}},
+			Ports:           []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8080}},
+			Resources:       scorerResources(),
+			SecurityContext: hardenedContainerSecurityContext(),
 			ReadinessProbe: &corev1.Probe{ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{Path: "/healthz", Port: intstrFromInt(8080)},
 			}},

@@ -17,6 +17,7 @@ var (
 
 type ModelSpec struct {
 	// Image of the scoring service (Kafka consumer).
+	// +kubebuilder:validation:MinLength=1
 	Image string `json:"image"`
 	// Name of a docker-registry Secret in the same namespace, for pulling
 	// private images (e.g. GHCR). Optional.
@@ -26,8 +27,10 @@ type ModelSpec struct {
 
 type KafkaSpec struct {
 	// Bootstrap servers, e.g. "kafka:9092".
+	// +kubebuilder:validation:MinLength=1
 	Brokers string `json:"brokers"`
-	Topic   string `json:"topic"`
+	// +kubebuilder:validation:MinLength=1
+	Topic string `json:"topic"`
 	// +optional
 	ConsumerGroup string `json:"consumerGroup,omitempty"`
 }
@@ -35,25 +38,35 @@ type KafkaSpec struct {
 type SLOSpec struct {
 	// Maximum p99.9 latency in milliseconds. Default 250 (the reference SLA).
 	// +kubebuilder:default=250
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=60000
 	// +optional
 	LatencyP999Ms int32 `json:"latencyP999Ms,omitempty"`
 	// +optional
 	ErrorRatePct string `json:"errorRatePct,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="self.maxReplicas == 0 || self.minReplicas == 0 || self.maxReplicas >= self.minReplicas",message="maxReplicas must be greater than or equal to minReplicas"
 type ScalingSpec struct {
 	// +kubebuilder:default=1
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
 	// +optional
 	MinReplicas int32 `json:"minReplicas,omitempty"`
 	// +kubebuilder:default=10
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
 	// +optional
 	MaxReplicas int32 `json:"maxReplicas,omitempty"`
 	// Target lag per replica; above this the operator scales out.
 	// +kubebuilder:default=1000
+	// +kubebuilder:validation:Minimum=1
 	// +optional
 	TargetLagPerReplica int64 `json:"targetLagPerReplica,omitempty"`
 	// Minimum time between scaling decisions, to avoid flapping.
 	// +kubebuilder:default=30
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=3600
 	// +optional
 	CooldownSeconds int32 `json:"cooldownSeconds,omitempty"`
 }
@@ -63,19 +76,26 @@ type CanarySpec struct {
 	// +optional
 	Enabled bool `json:"enabled,omitempty"`
 	// Candidate image to validate before it becomes spec.model.image.
+	// +kubebuilder:validation:MinLength=1
 	// +optional
 	Image string `json:"image,omitempty"`
 	// % of total replicas assigned to the canary (it shares the consumer
 	// group with stable, so it receives that fraction of traffic via rebalance).
 	// +kubebuilder:default=20
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=100
 	// +optional
 	StepPercent int32 `json:"stepPercent,omitempty"`
 	// Error rate (%) above which automatic rollback is triggered.
 	// +kubebuilder:default=5
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
 	// +optional
 	ErrorRateThresholdPct int32 `json:"errorRateThresholdPct,omitempty"`
 	// Evaluation window before marking the canary safe for promotion.
 	// +kubebuilder:default=120
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=3600
 	// +optional
 	EvaluationSeconds int32 `json:"evaluationSeconds,omitempty"`
 }

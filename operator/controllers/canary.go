@@ -79,6 +79,7 @@ func (r *ScoringPipelineReconciler) reconcileCanary(ctx context.Context, sp *pla
 		dep.Spec.Replicas = &canaryReplicas
 		dep.Spec.Selector = &metav1.LabelSelector{MatchLabels: labels}
 		dep.Spec.Template.Labels = labels
+		dep.Spec.Template.Spec.SecurityContext = hardenedPodSecurityContext()
 		dep.Spec.Template.Spec.Containers = []corev1.Container{{
 			Name:  "scorer",
 			Image: sp.Spec.Canary.Image,
@@ -89,7 +90,9 @@ func (r *ScoringPipelineReconciler) reconcileCanary(ctx context.Context, sp *pla
 				{Name: "PIPELINE_NAME", Value: sp.Name},
 				{Name: "ROLE", Value: "canary"},
 			},
-			Ports: []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8080}},
+			Ports:           []corev1.ContainerPort{{Name: "metrics", ContainerPort: 8080}},
+			Resources:       scorerResources(),
+			SecurityContext: hardenedContainerSecurityContext(),
 		}}
 		if sp.Spec.Model.ImagePullSecret != "" {
 			dep.Spec.Template.Spec.ImagePullSecrets = []corev1.LocalObjectReference{{Name: sp.Spec.Model.ImagePullSecret}}
@@ -141,7 +144,7 @@ func canaryErrorRatePct(ctx context.Context, pipeline string) (float64, bool) {
 	if err != nil {
 		return 0, false
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := prometheusHTTPClient.Do(req)
 	if err != nil {
 		return 0, false
 	}

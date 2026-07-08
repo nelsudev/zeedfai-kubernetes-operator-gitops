@@ -11,6 +11,10 @@ spec:
     metadata:
       labels: {app: zeedfai-operator}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: zeedfai-operator
       # Imagem privada no GHCR: requer o secret "ghcr-pull" (docker-registry),
       # criado fora do Git — ver gitops/infrastructure/operator/README.md.
@@ -29,6 +33,18 @@ spec:
               containerPort: 8082
             - name: metrics
               containerPort: 8083
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           readinessProbe:
             httpGet: {path: /readyz, port: health}
           livenessProbe:

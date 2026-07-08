@@ -99,8 +99,8 @@ func newPipeline(name string) *platformv1alpha1.ScoringPipeline {
 	return &platformv1alpha1.ScoringPipeline{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "default"},
 		Spec: platformv1alpha1.ScoringPipelineSpec{
-			Model: platformv1alpha1.ModelSpec{Image: "example.com/scorer:test", ImagePullSecret: "ghcr-pull"},
-			Kafka: platformv1alpha1.KafkaSpec{Brokers: "kafka.invalid:9092", Topic: "tx", ConsumerGroup: "g-" + name},
+			Model:   platformv1alpha1.ModelSpec{Image: "example.com/scorer:test", ImagePullSecret: "ghcr-pull"},
+			Kafka:   platformv1alpha1.KafkaSpec{Brokers: "kafka.invalid:9092", Topic: "tx", ConsumerGroup: "g-" + name},
 			Scaling: platformv1alpha1.ScalingSpec{MinReplicas: 2, MaxReplicas: 5, TargetLagPerReplica: 1000},
 		},
 	}
@@ -138,6 +138,15 @@ func TestReconcileCreatesWorkload(t *testing.T) {
 	}
 	if len(dep.Spec.Template.Spec.ImagePullSecrets) != 1 || dep.Spec.Template.Spec.ImagePullSecrets[0].Name != "ghcr-pull" {
 		t.Errorf("imagePullSecrets = %v", dep.Spec.Template.Spec.ImagePullSecrets)
+	}
+	if dep.Spec.Template.Spec.SecurityContext == nil || dep.Spec.Template.Spec.SecurityContext.RunAsNonRoot == nil || !*dep.Spec.Template.Spec.SecurityContext.RunAsNonRoot {
+		t.Errorf("pod securityContext should require non-root: %#v", dep.Spec.Template.Spec.SecurityContext)
+	}
+	if c.SecurityContext == nil || c.SecurityContext.AllowPrivilegeEscalation == nil || *c.SecurityContext.AllowPrivilegeEscalation {
+		t.Errorf("container securityContext should disable privilege escalation: %#v", c.SecurityContext)
+	}
+	if c.Resources.Requests.Cpu().IsZero() || c.Resources.Limits.Memory().IsZero() {
+		t.Errorf("resources should set cpu/memory requests and limits: %#v", c.Resources)
 	}
 
 	var svc corev1.Service
@@ -202,6 +211,12 @@ func TestCanaryDeploymentLifecycle(t *testing.T) {
 	}
 	if envs["ROLE"] != "canary" || envs["KAFKA_GROUP"] != "g-p3" {
 		t.Errorf("canary env = %v", envs)
+	}
+	if canary.Spec.Template.Spec.SecurityContext == nil || canary.Spec.Template.Spec.Containers[0].SecurityContext == nil {
+		t.Errorf("canary should include pod and container security contexts")
+	}
+	if canary.Spec.Template.Spec.Containers[0].Resources.Requests.Cpu().IsZero() {
+		t.Errorf("canary should include resource requests: %#v", canary.Spec.Template.Spec.Containers[0].Resources)
 	}
 
 	// disabling the canary removes the deployment

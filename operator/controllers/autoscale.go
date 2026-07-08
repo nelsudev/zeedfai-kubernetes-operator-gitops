@@ -17,7 +17,10 @@ import (
 
 // prometheusURL points at the kube-prometheus-stack installed via GitOps
 // (gitops/infrastructure/monitoring). Configurable for tests.
-var prometheusURL = getenvDefault("PROMETHEUS_URL", "http://monitoring-kube-prometheus-prometheus.monitoring.svc:9090")
+var (
+	prometheusURL        = getenvDefault("PROMETHEUS_URL", "http://monitoring-kube-prometheus-prometheus.monitoring.svc:9090")
+	prometheusHTTPClient = &http.Client{Timeout: 5 * time.Second}
+)
 
 func getenvDefault(k, def string) string {
 	if v := os.Getenv(k); v != "" {
@@ -86,7 +89,7 @@ func sloLatencyViolated(ctx context.Context, pipeline string, maxMs int32) bool 
 	if err != nil {
 		return false
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := prometheusHTTPClient.Do(req)
 	if err != nil {
 		return false
 	}

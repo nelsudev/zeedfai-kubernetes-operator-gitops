@@ -41,6 +41,10 @@ spec:
     metadata:
       labels: {app: platform-api}
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       serviceAccountName: platform-api
       imagePullSecrets:
         - name: ghcr-pull
@@ -54,6 +58,18 @@ spec:
               value: http://loadgen.default.svc:8081
           ports:
             - containerPort: 8090
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           readinessProbe:
             httpGet: {path: /healthz, port: 8090}
 ---

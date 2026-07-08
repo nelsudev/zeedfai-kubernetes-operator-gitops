@@ -20,6 +20,13 @@ kubectl create secret docker-registry ghcr-pull \
   --docker-username=nelsudev \
   --docker-password="$(gh auth token)" \
   -n default --dry-run=client -o yaml | kubectl apply -f -
+
+# Flux image automation scans the private scorer image from flux-system.
+kubectl create secret docker-registry ghcr-pull \
+  --docker-server=ghcr.io \
+  --docker-username=nelsudev \
+  --docker-password="$(gh auth token)" \
+  -n flux-system --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 In production this would be managed via SOPS/Sealed Secrets/External

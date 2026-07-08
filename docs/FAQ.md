@@ -99,9 +99,14 @@ deleted a node by hand, do the same.
 ## GitOps / images
 
 **Q: `flux bootstrap` fails on `Kubernetes version ... does not match >=1.33`.**
-The Flux 2.9 CLI wants k8s ≥1.33, but kind ships 1.32. Use an older Flux CLI for
-bootstrap (2.3.x works against 1.28+): download it once and run `flux bootstrap`
-with it. The in-cluster controllers are unaffected.
+The repo-managed Flux install is now generated with Flux 2.9.0 and includes
+the image automation controllers. Use a Kubernetes cluster compatible with the
+Flux 2.9 CLI for the full GitOps path, or use the local dev loop
+(`make demo-up` + `make run`) when testing on an older kind cluster. If you
+intentionally bootstrap with an older Flux CLI, regenerate
+`gitops/clusters/staging/flux-system/gotk-components.yaml` with the same
+version and keep
+`--components-extra=image-reflector-controller,image-automation-controller`.
 
 **Q: Images are private — how do the deployments pull them?**
 GHCR packages default to private and the `gh` OAuth token can't flip visibility

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,14 @@ var (
 
 	prometheusURL = getenv("PROMETHEUS_URL", "http://monitoring-kube-prometheus-prometheus.monitoring.svc:9090")
 	loadgenURL    = getenv("LOADGEN_URL", "http://loadgen.default.svc:8081")
+	httpClient    = &http.Client{Timeout: 5 * time.Second}
+)
+
+const (
+	defaultBurstRate    = 2000
+	defaultBurstSeconds = 120
+	maxBurstRate        = 5000
+	maxBurstSeconds     = 300
 )
 
 func main() {
@@ -113,7 +122,7 @@ func main() {
 		for key, q := range queries {
 			u := fmt.Sprintf("%s/api/v1/query_range?query=%s&start=%d&end=%d&step=15",
 				strings.TrimRight(prometheusURL, "/"), url.QueryEscape(q), start, end)
-			resp, err := http.Get(u)
+			resp, err := httpClient.Get(u)
 			if err != nil {
 				continue
 			}
@@ -136,17 +145,21 @@ func main() {
 	})
 
 	mux.HandleFunc("POST /api/burst", func(w http.ResponseWriter, r *http.Request) {
-		rate := r.URL.Query().Get("rate")
-		seconds := r.URL.Query().Get("seconds")
-		if rate == "" {
-			rate = "2000"
+		q := r.URL.Query()
+		rate, err := boundedIntParam(q, "rate", defaultBurstRate, 1, maxBurstRate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-		if seconds == "" {
-			seconds = "120"
+		seconds, err := boundedIntParam(q, "seconds", defaultBurstSeconds, 1, maxBurstSeconds)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-		u := fmt.Sprintf("%s/burst?rate=%s&seconds=%s", strings.TrimRight(loadgenURL, "/"), url.QueryEscape(rate), url.QueryEscape(seconds))
+
+		u := fmt.Sprintf("%s/burst?rate=%d&seconds=%d", strings.TrimRight(loadgenURL, "/"), rate, seconds)
 		req, _ := http.NewRequestWithContext(r.Context(), http.MethodPost, u, nil)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -167,7 +180,23 @@ func main() {
 
 	addr := getenv("LISTEN_ADDR", ":8090")
 	log.Printf("platform-api listening on %s (prometheus=%s loadgen=%s)", addr, prometheusURL, loadgenURL)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	srv := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	log.Fatal(srv.ListenAndServe())
+}
+
+func boundedIntParam(values url.Values, name string, def, min, max int) (int, error) {
+	raw := values.Get(name)
+	if raw == "" {
+		return def, nil
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer", name)
+	}
+	if v < min || v > max {
+		return 0, fmt.Errorf("%s must be between %d and %d", name, min, max)
+	}
+	return v, nil
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -181,4 +210,3 @@ func getenv(k, def string) string {
 	}
 	return def
 }
-

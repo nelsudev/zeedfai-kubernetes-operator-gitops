@@ -60,15 +60,20 @@ spec:
                     description: Error rate (%) above which automatic rollback is
                       triggered.
                     format: int32
+                    maximum: 100
+                    minimum: 0
                     type: integer
                   evaluationSeconds:
                     default: 120
                     description: Evaluation window before marking the canary safe
                       for promotion.
                     format: int32
+                    maximum: 3600
+                    minimum: 1
                     type: integer
                   image:
                     description: Candidate image to validate before it becomes spec.model.image.
+                    minLength: 1
                     type: string
                   stepPercent:
                     default: 20
@@ -76,16 +81,20 @@ spec:
                       % of total replicas assigned to the canary (it shares the consumer
                       group with stable, so it receives that fraction of traffic via rebalance).
                     format: int32
+                    maximum: 100
+                    minimum: 1
                     type: integer
                 type: object
               kafka:
                 properties:
                   brokers:
                     description: Bootstrap servers, e.g. "kafka:9092".
+                    minLength: 1
                     type: string
                   consumerGroup:
                     type: string
                   topic:
+                    minLength: 1
                     type: string
                 required:
                 - brokers
@@ -95,6 +104,7 @@ spec:
                 properties:
                   image:
                     description: Image of the scoring service (Kafka consumer).
+                    minLength: 1
                     type: string
                   imagePullSecret:
                     description: |-
@@ -111,22 +121,33 @@ spec:
                     description: Minimum time between scaling decisions, to avoid
                       flapping.
                     format: int32
+                    maximum: 3600
+                    minimum: 1
                     type: integer
                   maxReplicas:
                     default: 10
                     format: int32
+                    maximum: 100
+                    minimum: 1
                     type: integer
                   minReplicas:
                     default: 1
                     format: int32
+                    maximum: 100
+                    minimum: 1
                     type: integer
                   targetLagPerReplica:
                     default: 1000
                     description: Target lag per replica; above this the operator scales
                       out.
                     format: int64
+                    minimum: 1
                     type: integer
                 type: object
+                x-kubernetes-validations:
+                - message: maxReplicas must be greater than or equal to minReplicas
+                  rule: self.maxReplicas == 0 || self.minReplicas == 0 || self.maxReplicas
+                    >= self.minReplicas
               slo:
                 properties:
                   errorRatePct:
@@ -136,6 +157,8 @@ spec:
                     description: Maximum p99.9 latency in milliseconds. Default 250
                       (the reference SLA).
                     format: int32
+                    maximum: 60000
+                    minimum: 1
                     type: integer
                 type: object
             required:

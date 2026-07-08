@@ -28,6 +28,11 @@ type Transaction struct {
 
 var countries = []string{"PT", "ES", "FR", "DE", "GB", "XX", "ZZ"}
 
+const (
+	maxBurstRate    = 5000
+	maxBurstSeconds = 300
+)
+
 func main() {
 	brokers := getenv("KAFKA_BROKERS", "localhost:9092")
 	topic := getenv("KAFKA_TOPIC", "transactions")
@@ -50,8 +55,8 @@ func main() {
 		}
 		burstRate, _ := strconv.ParseInt(r.URL.Query().Get("rate"), 10, 64)
 		seconds, _ := strconv.ParseInt(r.URL.Query().Get("seconds"), 10, 64)
-		if burstRate <= 0 || seconds <= 0 {
-			http.Error(w, "usage: POST /burst?rate=2000&seconds=120", http.StatusBadRequest)
+		if burstRate <= 0 || burstRate > maxBurstRate || seconds <= 0 || seconds > maxBurstSeconds {
+			http.Error(w, fmt.Sprintf("usage: POST /burst?rate=1..%d&seconds=1..%d", maxBurstRate, maxBurstSeconds), http.StatusBadRequest)
 			return
 		}
 		rate.Store(burstRate)
@@ -63,7 +68,10 @@ func main() {
 		fmt.Fprintf(w, "burst: %d ev/s for %ds\n", burstRate, seconds)
 	})
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
-	go func() { log.Fatal(http.ListenAndServe(":8081", nil)) }()
+	go func() {
+		srv := &http.Server{Addr: ":8081", Handler: http.DefaultServeMux, ReadHeaderTimeout: 5 * time.Second}
+		log.Fatal(srv.ListenAndServe())
+	}()
 
 	log.Printf("loadgen: brokers=%s topic=%s base=%d ev/s", brokers, topic, baseRate)
 	ctx := context.Background()

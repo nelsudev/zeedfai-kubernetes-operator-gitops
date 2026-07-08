@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - flux-system
+  - sources.yaml
+  - infra-crds.yaml
+  - infra-strimzi.yaml
+  - infra-kafka-cluster.yaml
+  - infra-monitoring.yaml
+  - infra-operator.yaml
+  - infra-platform-api.yaml
+  - infra-image-automation.yaml
+  - infra-demo.yaml

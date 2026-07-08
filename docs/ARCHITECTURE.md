@@ -433,6 +433,8 @@ gitops/
 │   ├── infra-kafka-cluster.yaml
 │   ├── infra-monitoring.yaml
 │   ├── infra-operator.yaml
+│   ├── infra-platform-api.yaml
+│   ├── infra-image-automation.yaml
 │   └── infra-demo.yaml
 └── infrastructure/            # the actual content (HelmReleases, CRDs, etc.)
     ├── sources/                (HelmRepository: strimzi, prometheus-community)
@@ -441,6 +443,8 @@ gitops/
     ├── kafka-cluster/          (the Kafka/KafkaNodePool/KafkaTopic CRs)
     ├── monitoring/             (kube-prometheus-stack HelmRelease)
     ├── operator/               (the zeedfai-operator Deployment + RBAC)
+    ├── platform-api/           (read-only operations API + GUI)
+    ├── image-automation/       (Flux ImageRepository/ImagePolicy/ImageUpdateAutomation)
     └── demo/                   (loadgen + the example ScoringPipeline)
 ```
 

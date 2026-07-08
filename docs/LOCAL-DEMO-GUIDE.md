@@ -38,8 +38,11 @@ Two ways to run the operator:
   operator outside the cluster against kind), then `make deploy-sample`.
 - **Full GitOps (what production looks like):** fork the repo, run
   `flux bootstrap github --owner=<you> --repository=zeedfai-kubernetes-operator-gitops --branch=main
-  --path=gitops/clusters/staging --personal`, and create the `ghcr-pull`
-  secret per `gitops/infrastructure/operator/README.md`. Flux then installs
+  --path=gitops/clusters/staging --personal
+  --components-extra=image-reflector-controller,image-automation-controller`,
+  and create the `ghcr-pull` secret per
+  `gitops/infrastructure/operator/README.md` in `zeedfai-system`, `default`,
+  and `flux-system`. Flux then installs
   everything, including the operator in-cluster.
 
 Verify:

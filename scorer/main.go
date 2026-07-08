@@ -6,9 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
-	"math/rand"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -75,7 +75,10 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
-	go func() { log.Fatal(http.ListenAndServe(":8080", nil)) }()
+	go func() {
+		srv := &http.Server{Addr: ":8080", Handler: http.DefaultServeMux, ReadHeaderTimeout: 5 * time.Second}
+		log.Fatal(srv.ListenAndServe())
+	}()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
