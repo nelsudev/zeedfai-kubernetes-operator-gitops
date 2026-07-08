@@ -64,7 +64,10 @@ burst: ## Dispara um burst de carga: 2000 ev/s durante 120s
 monitoring: ## kube-prometheus-stack (CRDs ServiceMonitor/PrometheusRule requeridos pelo operator)
 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
 	helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-	  -n monitoring --create-namespace --set grafana.adminPassword=zeedfai
+	  -n monitoring --create-namespace --set grafana.adminPassword=zeedfai \
+	  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+	  --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
+	  --set prometheus.prometheusSpec.ruleSelectorNilUsesHelmValues=false
 	@echo "Grafana: kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80 (admin/zeedfai)"
 
 demo-down: ## Destrói o cluster kind

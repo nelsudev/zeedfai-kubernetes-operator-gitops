@@ -20,7 +20,7 @@ import (
 	platformv1alpha1 "github.com/bastian/zeedfai/operator/api/v1alpha1"
 )
 
-const runbookBaseURL = "https://github.com/bastian/zeedfai/blob/main/runbooks"
+const runbookBaseURL = "https://github.com/nelsudev/zeedfai/blob/main/runbooks"
 
 // ScoringPipelineReconciler reconcilia ScoringPipelines: Deployment + Service
 // hoje; autoscaling por consumer lag e self-healing por SLO na Fase 4.

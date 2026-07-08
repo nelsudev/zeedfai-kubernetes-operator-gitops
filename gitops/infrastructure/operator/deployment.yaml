@@ -18,7 +18,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: operator
-          image: ghcr.io/nelsudev/zeedfai-operator:0.3.2
+          image: ghcr.io/nelsudev/zeedfai-operator:0.3.3
           env:
             - name: ENABLE_LEADER_ELECTION
               value: "true"

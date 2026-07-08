@@ -1,3 +1,7 @@
+# Sample para o fluxo de DEV local (make demo-up + make run + make deploy-sample).
+# Usa a imagem construída localmente e carregada no kind por `make images`
+# (zeedfai/scorer:dev) — sem GHCR, sem imagePullSecret. Para o fluxo GitOps,
+# ver gitops/infrastructure/demo/pipeline.yaml (imagens GHCR versionadas).
 apiVersion: platform.zeedfai.io/v1alpha1
 kind: ScoringPipeline
 metadata:
@@ -5,8 +9,7 @@ metadata:
   namespace: default
 spec:
   model:
-    image: ghcr.io/nelsudev/zeedfai-scorer:0.1.0
-    imagePullSecret: ghcr-pull
+    image: zeedfai/scorer:dev
   kafka:
     brokers: zeedfai-kafka-bootstrap.kafka:9092
     topic: transactions

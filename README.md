@@ -2,7 +2,8 @@
 
 > Repo: https://github.com/nelsudev/zeedfai — GitOps live via Flux (ver secção "GitOps").
 > Documentação exaustiva (o que cada ficheiro/componente faz e porquê): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-> **Step-by-step local demo guide (EN): [docs/LOCAL-DEMO-GUIDE.md](docs/LOCAL-DEMO-GUIDE.md)** — all four demos, verified timings included.
+> **Step-by-step local demo guide (EN): [docs/LOCAL-DEMO-GUIDE.md](docs/LOCAL-DEMO-GUIDE.md)** — all demos, verified timings.
+> **[docs/FAQ.md](docs/FAQ.md)** — common questions and things that break, with fixes.
 
 Plataforma de demonstração de **platform engineering** para fraud-scoring em
 streaming: um Kubernetes Operator em Go que gere pipelines de scoring

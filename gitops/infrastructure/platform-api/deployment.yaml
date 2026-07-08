@@ -46,7 +46,7 @@ spec:
         - name: ghcr-pull
       containers:
         - name: platform-api
-          image: ghcr.io/nelsudev/zeedfai-platform-api:0.1.0
+          image: ghcr.io/nelsudev/zeedfai-platform-api:0.1.1
           env:
             - name: PROMETHEUS_URL
               value: http://monitoring-kube-prometheus-prometheus.monitoring.svc:9090
