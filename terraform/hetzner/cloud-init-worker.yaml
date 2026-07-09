@@ -1,5 +1,21 @@
 #cloud-config
 package_update: true
 packages: [curl]
+write_files:
+  - path: /etc/netplan/60-hetzner-private.yaml
+    permissions: "0644"
+    content: |
+      network:
+        version: 2
+        ethernets:
+          enp7s0:
+            addresses:
+              - ${private_ip}/32
+            routes:
+              - to: 10.0.0.1/32
+                scope: link
+              - to: 10.0.0.0/16
+                via: 10.0.0.1
 runcmd:
-  - curl -sfL https://get.k3s.io | K3S_URL="https://${cp_ip}:6443" K3S_TOKEN="${k3s_token}" sh -
+  - netplan apply
+  - curl -sfL https://get.k3s.io | K3S_URL="https://${cp_ip}:6443" K3S_TOKEN="${k3s_token}" INSTALL_K3S_EXEC="agent --node-ip ${private_ip} --flannel-iface enp7s0" sh -

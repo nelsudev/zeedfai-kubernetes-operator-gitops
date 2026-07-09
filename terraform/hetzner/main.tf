@@ -1,8 +1,8 @@
-# zeedfai — cluster k3s na Hetzner Cloud (Fase 7)
+# zeedfai — k3s cluster on Hetzner Cloud
 #
-# Billing à hora: subir para a demo, correr o burst, `terraform destroy`.
-# Todos os servers levam a label zeedfai=true — é por ela que a GitHub
-# Action de teardown noturno (teardown-cloud-demo.yml) apanha órfãos.
+# Hourly billing: bring it up for the demo, run the burst, then
+# `terraform destroy`. Every server gets the zeedfai=true label so the
+# nightly teardown-cloud-demo.yml workflow can delete orphaned servers.
 
 terraform {
   required_providers {
@@ -14,24 +14,41 @@ terraform {
 }
 
 variable "hcloud_token" {
-  description = "Token da API Hetzner Cloud (project → Security → API tokens)"
+  description = "Hetzner Cloud API token (project → Security → API tokens)"
   type        = string
   sensitive   = true
 }
 
 variable "ssh_public_key" {
-  description = "Chave SSH pública para acesso aos nodes"
+  description = "SSH public key for node access"
   type        = string
 }
 
 variable "worker_count" {
-  description = "Nº de workers fixos (o cluster-autoscaler adiciona os elásticos)"
+  description = "Number of fixed workers; cluster-autoscaler adds elastic ones"
   type        = number
   default     = 1
 }
 
+variable "server_type" {
+  description = "Hetzner server type for the control-plane and fixed workers"
+  type        = string
+  default     = "ccx13"
+}
+
+variable "location" {
+  description = "Hetzner location where servers are created"
+  type        = string
+  default     = "fsn1"
+}
+
 provider "hcloud" {
   token = var.hcloud_token
+}
+
+locals {
+  control_plane_private_ip = "10.0.1.10"
+  worker_private_ips       = [for i in range(var.worker_count) : cidrhost("10.0.1.0/24", 20 + i)]
 }
 
 resource "hcloud_ssh_key" "zeedfai" {
@@ -53,19 +70,20 @@ resource "hcloud_network_subnet" "nodes" {
 
 resource "hcloud_server" "control_plane" {
   name        = "zeedfai-cp"
-  server_type = "cx22" # 2 vCPU / 4 GB — ~€0.006/h
+  server_type = var.server_type
   image       = "ubuntu-24.04"
-  location    = "nbg1"
+  location    = var.location
   ssh_keys    = [hcloud_ssh_key.zeedfai.id]
   labels      = { zeedfai = "true", role = "control-plane" }
 
   network {
     network_id = hcloud_network.zeedfai.id
-    ip         = "10.0.1.10"
+    ip         = local.control_plane_private_ip
   }
 
   user_data = templatefile("${path.module}/cloud-init-cp.yaml", {
-    k3s_token = random_password.k3s_token.result
+    k3s_token  = random_password.k3s_token.result
+    private_ip = local.control_plane_private_ip
   })
 
   depends_on = [hcloud_network_subnet.nodes]
@@ -74,19 +92,21 @@ resource "hcloud_server" "control_plane" {
 resource "hcloud_server" "worker" {
   count       = var.worker_count
   name        = "zeedfai-worker-${count.index}"
-  server_type = "cx22"
+  server_type = var.server_type
   image       = "ubuntu-24.04"
-  location    = "nbg1"
+  location    = var.location
   ssh_keys    = [hcloud_ssh_key.zeedfai.id]
   labels      = { zeedfai = "true", role = "worker" }
 
   network {
     network_id = hcloud_network.zeedfai.id
+    ip         = local.worker_private_ips[count.index]
   }
 
   user_data = templatefile("${path.module}/cloud-init-worker.yaml", {
-    k3s_token = random_password.k3s_token.result
-    cp_ip     = "10.0.1.10"
+    k3s_token  = random_password.k3s_token.result
+    cp_ip      = local.control_plane_private_ip
+    private_ip = local.worker_private_ips[count.index]
   })
 
   depends_on = [hcloud_server.control_plane]
@@ -104,10 +124,9 @@ output "control_plane_ip" {
 output "next_steps" {
   value = <<-EOT
     1. ssh root@${hcloud_server.control_plane.ipv4_address}
-    2. copiar /etc/rancher/k3s/k3s.yaml (trocar 127.0.0.1 pelo IP público)
-    3. flux bootstrap github --owner=nelsudev --repository=zeedfai \
-         --branch=main --path=gitops/clusters/cloud --personal
-    4. instalar o cluster-autoscaler com o provider hetzner (ver README.md)
-    5. correr a demo de burst; no fim: terraform destroy
+    2. copy /etc/rancher/k3s/k3s.yaml and replace 127.0.0.1 with the public IP
+    3. bootstrap Flux against the Git branch/path you want to validate
+    4. install the Hetzner cluster-autoscaler provider if node scaling is in scope
+    5. run the burst demo; when finished, run terraform destroy
   EOT
 }

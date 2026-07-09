@@ -6,6 +6,7 @@ metadata:
 spec:
   dependsOn:
     - name: infra-crds
+    - name: infra-monitoring
   interval: 30m
   path: ./gitops/infrastructure/operator
   prune: true
