@@ -31,9 +31,21 @@ export TF_VAR_server_type=cpx31
 export TF_VAR_location=hel1
 ```
 
+By default, the firewall allows SSH from anywhere and keeps the public
+Kubernetes API port (`6443`) closed. For direct remote `kubectl` access, set a
+trusted source range before applying:
+
+```bash
+export TF_VAR_kube_api_allowed_cidrs='["203.0.113.10/32"]'
+```
+
+If `TF_VAR_kube_api_allowed_cidrs` is empty, use SSH port-forwarding or run
+`kubectl` from the control-plane host.
+
 Cost depends on the selected server type. The default creates 2× `ccx13`
-instances, which are intentionally more expensive but were available for the
-real x86 validation run. Destroy them as soon as the run is finished.
+instances, which were available for the real x86 validation run and cost about
+€0.17/h total in `fsn1` at the 2026-07-09 listed price. Destroy them as soon
+as the run is finished.
 
 ## Node scaling (cluster-autoscaler)
 

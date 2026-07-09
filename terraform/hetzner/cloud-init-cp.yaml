@@ -2,13 +2,34 @@
 package_update: true
 packages: [curl]
 write_files:
-  - path: /etc/netplan/60-hetzner-private.yaml
-    permissions: "0644"
+  - path: /usr/local/sbin/configure-hetzner-private-net
+    permissions: "0755"
     content: |
+      #!/bin/sh
+      set -eu
+
+      metadata="$(curl -fsS http://169.254.169.254/hetzner/v1/metadata/private-networks)"
+      mac="$(printf '%s\n' "$metadata" | awk '/mac_address:/ {print tolower($2); exit}')"
+      private_iface=""
+
+      for address_file in /sys/class/net/*/address; do
+        iface="$(basename "$(dirname "$address_file")")"
+        if [ "$(cat "$address_file")" = "$mac" ]; then
+          private_iface="$iface"
+          break
+        fi
+      done
+
+      if [ -z "$private_iface" ]; then
+        echo "could not find Hetzner private interface with MAC $mac" >&2
+        exit 1
+      fi
+
+      cat > /etc/netplan/60-hetzner-private.yaml <<EOF
       network:
         version: 2
         ethernets:
-          enp7s0:
+          $private_iface:
             addresses:
               - ${private_ip}/32
             routes:
@@ -16,6 +37,10 @@ write_files:
                 scope: link
               - to: 10.0.0.0/16
                 via: 10.0.0.1
+      EOF
+
+      netplan apply
+      printf '%s\n' "$private_iface" > /run/hetzner-private-interface
 runcmd:
-  - netplan apply
-  - PUBLIC_IPV4="$(curl -fsS http://169.254.169.254/hetzner/v1/metadata/public-ipv4)" && curl -sfL https://get.k3s.io | K3S_TOKEN="${k3s_token}" INSTALL_K3S_EXEC="server --write-kubeconfig-mode 644 --node-ip ${private_ip} --advertise-address ${private_ip} --tls-san ${private_ip} --tls-san $PUBLIC_IPV4 --flannel-iface enp7s0" sh -
+  - /usr/local/sbin/configure-hetzner-private-net
+  - PRIVATE_IFACE="$(cat /run/hetzner-private-interface)" && PUBLIC_IPV4="$(curl -fsS http://169.254.169.254/hetzner/v1/metadata/public-ipv4)" && curl -sfL https://get.k3s.io | K3S_TOKEN="${k3s_token}" INSTALL_K3S_EXEC="server --write-kubeconfig-mode 644 --node-ip ${private_ip} --advertise-address ${private_ip} --tls-san ${private_ip} --tls-san $PUBLIC_IPV4 --flannel-iface $PRIVATE_IFACE" sh -

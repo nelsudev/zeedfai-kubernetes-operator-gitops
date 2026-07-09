@@ -42,6 +42,18 @@ variable "location" {
   default     = "fsn1"
 }
 
+variable "admin_cidrs" {
+  description = "CIDR ranges allowed to SSH to nodes"
+  type        = list(string)
+  default     = ["0.0.0.0/0", "::/0"]
+}
+
+variable "kube_api_allowed_cidrs" {
+  description = "CIDR ranges allowed to reach the public Kubernetes API on 6443; empty keeps it closed publicly"
+  type        = list(string)
+  default     = []
+}
+
 provider "hcloud" {
   token = var.hcloud_token
 }
@@ -68,13 +80,42 @@ resource "hcloud_network_subnet" "nodes" {
   ip_range     = "10.0.1.0/24"
 }
 
+resource "hcloud_firewall" "zeedfai" {
+  name = "zeedfai"
+
+  rule {
+    direction  = "in"
+    protocol   = "tcp"
+    port       = "22"
+    source_ips = var.admin_cidrs
+  }
+
+  dynamic "rule" {
+    for_each = length(var.kube_api_allowed_cidrs) == 0 ? [] : [1]
+
+    content {
+      direction  = "in"
+      protocol   = "tcp"
+      port       = "6443"
+      source_ips = var.kube_api_allowed_cidrs
+    }
+  }
+
+  rule {
+    direction  = "in"
+    protocol   = "icmp"
+    source_ips = var.admin_cidrs
+  }
+}
+
 resource "hcloud_server" "control_plane" {
-  name        = "zeedfai-cp"
-  server_type = var.server_type
-  image       = "ubuntu-24.04"
-  location    = var.location
-  ssh_keys    = [hcloud_ssh_key.zeedfai.id]
-  labels      = { zeedfai = "true", role = "control-plane" }
+  name         = "zeedfai-cp"
+  server_type  = var.server_type
+  image        = "ubuntu-24.04"
+  location     = var.location
+  ssh_keys     = [hcloud_ssh_key.zeedfai.id]
+  firewall_ids = [hcloud_firewall.zeedfai.id]
+  labels       = { zeedfai = "true", role = "control-plane" }
 
   network {
     network_id = hcloud_network.zeedfai.id
@@ -90,13 +131,14 @@ resource "hcloud_server" "control_plane" {
 }
 
 resource "hcloud_server" "worker" {
-  count       = var.worker_count
-  name        = "zeedfai-worker-${count.index}"
-  server_type = var.server_type
-  image       = "ubuntu-24.04"
-  location    = var.location
-  ssh_keys    = [hcloud_ssh_key.zeedfai.id]
-  labels      = { zeedfai = "true", role = "worker" }
+  count        = var.worker_count
+  name         = "zeedfai-worker-${count.index}"
+  server_type  = var.server_type
+  image        = "ubuntu-24.04"
+  location     = var.location
+  ssh_keys     = [hcloud_ssh_key.zeedfai.id]
+  firewall_ids = [hcloud_firewall.zeedfai.id]
+  labels       = { zeedfai = "true", role = "worker" }
 
   network {
     network_id = hcloud_network.zeedfai.id
@@ -125,8 +167,9 @@ output "next_steps" {
   value = <<-EOT
     1. ssh root@${hcloud_server.control_plane.ipv4_address}
     2. copy /etc/rancher/k3s/k3s.yaml and replace 127.0.0.1 with the public IP
-    3. bootstrap Flux against the Git branch/path you want to validate
-    4. install the Hetzner cluster-autoscaler provider if node scaling is in scope
-    5. run the burst demo; when finished, run terraform destroy
+    3. if kube_api_allowed_cidrs is empty, use SSH port-forwarding for kubectl
+    4. bootstrap Flux against the Git branch/path you want to validate
+    5. install the Hetzner cluster-autoscaler provider if node scaling is in scope
+    6. run the burst demo; when finished, run terraform destroy
   EOT
 }
