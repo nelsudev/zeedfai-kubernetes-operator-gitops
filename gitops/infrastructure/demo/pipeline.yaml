@@ -12,7 +12,11 @@ spec:
   # detetou a taxa de erro e fez rollback sozinho em ~80s — ver Event
   # CanaryRolledBack no histórico. Reativar com uma imagem candidata real.
   canary:
-    enabled: false
+    enabled: true
+    image: ghcr.io/nelsudev/zeedfai-scorer:bad-canary-e2e-2
+    stepPercent: 20
+    errorRateThresholdPct: 5
+    evaluationSeconds: 120
   kafka:
     brokers: zeedfai-kafka-bootstrap.kafka:9092
     topic: transactions
