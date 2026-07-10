@@ -80,8 +80,15 @@ KUBECONFIG=/tmp/zeedfai-hetzner-kubeconfig flux bootstrap github \
   --repository=zeedfai-kubernetes-operator-gitops \
   --branch=cloud/hetzner-e2e-validation \
   --path=gitops/clusters/staging \
+  --components-extra=image-reflector-controller,image-automation-controller \
   --personal
 ```
+
+Without `--components-extra`, the `infra-image-automation` Kustomization
+fails permanently (`no matches for kind "ImageUpdateAutomation"`) because
+the `ImageUpdateAutomation` CRD is never installed — this is already
+documented in `docs/FAQ.md` and `docs/LOCAL-DEMO-GUIDE.md` for the local
+demo, but was missing from this cloud test plan.
 
 Fallback route if GitHub auth or image registry prevents bootstrap:
 

@@ -51,4 +51,4 @@ write_files:
       printf '%s\n' "$public_ipv4" > /run/hetzner-public-ipv4
 runcmd:
   - /usr/local/sbin/configure-hetzner-private-net
-  - curl -fL https://get.k3s.io -o /root/install-k3s.sh && PRIVATE_IFACE="$(cat /run/hetzner-private-interface)" && PUBLIC_IPV4="$(cat /run/hetzner-public-ipv4)" && K3S_TOKEN="${k3s_token}" INSTALL_K3S_EXEC="server --write-kubeconfig-mode 644 --node-ip ${private_ip} --advertise-address ${private_ip} --tls-san ${private_ip} --tls-san $PUBLIC_IPV4 --flannel-iface $PRIVATE_IFACE" sh /root/install-k3s.sh
+  - curl --retry 10 --retry-all-errors --retry-delay 3 -fL https://get.k3s.io -o /root/install-k3s.sh && PRIVATE_IFACE="$(cat /run/hetzner-private-interface)" && PUBLIC_IPV4="$(cat /run/hetzner-public-ipv4)" && K3S_TOKEN="${k3s_token}" INSTALL_K3S_EXEC="server --write-kubeconfig-mode 644 --node-ip ${private_ip} --advertise-address ${private_ip} --tls-san ${private_ip} --tls-san $PUBLIC_IPV4 --flannel-iface $PRIVATE_IFACE" sh /root/install-k3s.sh
