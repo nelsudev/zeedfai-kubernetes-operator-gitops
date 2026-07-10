@@ -8,7 +8,7 @@ metadata:
 spec:
   interval: 1m0s
   ref:
-    branch: main
+    branch: test/hetzner-e2e-rerun-2
   secretRef:
     name: flux-system
   url: ssh://git@github.com/nelsudev/zeedfai-kubernetes-operator-gitops
